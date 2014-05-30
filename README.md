@@ -3,7 +3,7 @@ php-api-generator-for-owasp-zap
 
 PHP client API generator for OWASP ZAP
 
-##Getting Started
+##Generating PHP client API files
 
 1. Preparing zaproxy project in your local environment.
     - I checked out a repository from [zaproxy/svn/branches/2.3](https://code.google.com/p/zaproxy/source/browse/#svn%2Fbranches%2F2.3) using [Eclipse](http://www.eclipse.org/).
