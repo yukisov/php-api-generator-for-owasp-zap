@@ -17,8 +17,13 @@ PHP client API generator for OWASP ZAP
     1. `$ cp ./build.xml.patch your/zaproxy/build/`
     2. `$ cd your/zaproxy/build`
     3. `$ patch build.xml < build.xml.patch`
-4. Right click zaproxy project, select 'Build Project'
-5. PHP client API files are created in `your/zaproxy/php/api/src/Zap/`
+4. Right click zaproxy project and select 'Refresh'.
+5. Right click zaproxy project and select 'Build Project'.
+6. Create PHP client API files.
+    - `$ cd your/zaproxy/build`
+    - `$ ant generate-apis`
+        - This process needs `your/zaproxy/bin/org/src/zaproxy/zap/extension/api/PhpAPIGenerator.class` file.
+7. PHP client API files are created in `your/zaproxy/php/api/src/Zap/`
 
 
 ##License
