@@ -23,7 +23,7 @@ PHP client API generator for OWASP ZAP
     - `$ cd your/zaproxy/build`
     - `$ ant generate-apis`
         - This process needs `your/zaproxy/bin/org/src/zaproxy/zap/extension/api/PhpAPIGenerator.class` file.
-7. PHP client API files are created in `your/zaproxy/php/api/src/Zap/`
+7. PHP client API files have been created in `your/zaproxy/php/api/src/Zap/`
 
 
 ##License
