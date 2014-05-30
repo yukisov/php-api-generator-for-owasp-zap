@@ -1,0 +1,14 @@
+Index: build/build.xml
+===================================================================
+--- build/build.xml	(リビジョン 4917)
++++ build/build.xml	(作業コピー)
+@@ -560,6 +560,9 @@
+ 		<java classname="org.zaproxy.zap.extension.api.PythonAPIGenerator" dir=".." fork="yes">
+ 			<classpath refid="classpath" />
+ 		</java>
++		<java classname="org.zaproxy.zap.extension.api.PhpAPIGenerator" dir=".." fork="yes">
++			<classpath refid="classpath" />
++		</java>
+     </target>
+ 
+     <target name="copy-jar-to-extension-projects" depends="dist">
