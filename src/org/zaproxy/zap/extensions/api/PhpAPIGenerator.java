@@ -83,7 +83,24 @@ public class PhpAPIGenerator {
 							(element.getOptionalParamNames() != null &&
 								element.getOptionalParamNames().size() > 0);
 
-		out.write("    public function " + createMethodName(element.getName()) + "(");
+		// Add description if defined
+		String descTag = element.getDescriptionTag();
+		if (descTag == null) {
+			// This is the default, but it can be overriden by the getDescriptionTag method if required
+			descTag = component + ".api." + type + "." + element.getName();
+		}
+
+		try {
+			String desc = msgs.getString(descTag);
+			out.write("\t/*\n");
+			out.write("\t * " + desc + "\n");
+			out.write("\t */\n");
+		} catch (Exception e) {
+			// Might not be set, so just print out the ones that are missing
+			System.out.println("No i18n for: " + descTag);
+		}
+
+		out.write("\tpublic function " + createMethodName(element.getName()) + "(");
 
 		String paramMan = "";
 		if (element.getMandatoryParamNames() != null) {
@@ -116,22 +133,6 @@ public class PhpAPIGenerator {
 
 		out.write(") {\n");
 
-		// Add description if defined
-		String descTag = element.getDescriptionTag();
-		if (descTag == null) {
-			// This is the default, but it can be overriden by the getDescriptionTag method if required
-			descTag = component + ".api." + type + "." + element.getName();
-		}
-		try {
-			String desc = msgs.getString(descTag);
-			out.write("        /*\n");
-			out.write("         * " + desc + "\n");
-			out.write("         */\n");
-		} catch (Exception e) {
-			// Might not be set, so just print out the ones that are missing
-			System.out.println("No i18n for: " + descTag);
-		}
-
 		String method = "request";
 		String baseUrl = "base";
 		if (type.equals("other")) {
@@ -139,7 +140,7 @@ public class PhpAPIGenerator {
 			baseUrl += "other";
 		}
 
-		out.write("        return $this->zap->" + method + "($this->zap->" + baseUrl + " . '" +
+		out.write("\t\treturn $this->zap->" + method + "($this->zap->" + baseUrl + " . '" +
 				component + "/" + type + "/" + element.getName() + "/'");
 
 		// , {'url': url}))
