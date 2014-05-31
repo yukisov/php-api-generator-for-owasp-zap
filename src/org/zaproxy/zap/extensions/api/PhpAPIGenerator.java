@@ -92,7 +92,7 @@ public class PhpAPIGenerator {
 
 		try {
 			String desc = msgs.getString(descTag);
-			out.write("\t/*\n");
+			out.write("\t/**\n");
 			out.write("\t * " + desc + "\n");
 			out.write("\t */\n");
 		} catch (Exception e) {
