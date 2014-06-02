@@ -237,7 +237,6 @@ public class PhpAPIGenerator {
 	}
 
 	public static void main(String[] args) throws Exception {
-		// Command for generating a python version of the ZAP API
 
 		PhpAPIGenerator wapi = new PhpAPIGenerator();
 		wapi.generatePhpFiles();
