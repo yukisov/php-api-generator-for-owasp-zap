@@ -143,7 +143,6 @@ public class PhpAPIGenerator {
 		out.write("\t\treturn $this->zap->" + method + "($this->zap->" + baseUrl + " . '" +
 				component + "/" + type + "/" + element.getName() + "/'");
 
-		// , {'url': url}))
 		if (hasParams) {
 			out.write(", array(");
 			boolean first = true;
