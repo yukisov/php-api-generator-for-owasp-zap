@@ -118,7 +118,7 @@ public class PhpAPIGenerator {
 			    if (paramMan != "" || paramOpt != "") {
 			        paramOpt += ", ";
 			    }
-				paramOpt += "$" + param.toLowerCase();
+				paramOpt += "$" + param.toLowerCase() + "=''";
 			}
 			out.write(paramOpt);
 		}
