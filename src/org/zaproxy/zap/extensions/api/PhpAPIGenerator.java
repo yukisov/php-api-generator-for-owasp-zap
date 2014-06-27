@@ -236,10 +236,8 @@ public class PhpAPIGenerator {
 	}
 
 	public static void main(String[] args) throws Exception {
-
 		PhpAPIGenerator wapi = new PhpAPIGenerator();
 		wapi.generatePhpFiles();
-
 	}
 
 }
