@@ -27,4 +27,4 @@ PHP client API generator for OWASP ZAP
 
 
 ##License
-- MIT License
+- Apache License, Version 2.0
