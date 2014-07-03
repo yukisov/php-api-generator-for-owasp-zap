@@ -30,7 +30,7 @@ import java.util.ResourceBundle;
 import org.parosproxy.paros.Constant;
 
 public class PhpAPIGenerator {
-	private File dir = new File("php/api/src/Zap");
+	private File dir = new File("php/api/zapv2/src/Zap");
 
 	private final String HEADER =
 			"<?php\n" +
