@@ -2,21 +2,21 @@
 /**
  * Zed Attack Proxy (ZAP) and its related class files.
  *
- *  ZAP is an HTTP/HTTPS proxy for assessing web application security.
+ * ZAP is an HTTP/HTTPS proxy for assessing web application security.
  *
- *  Copyright the ZAP development team
+ * Copyright 2015 the ZAP development team
  *
- *  Licensed under the Apache License, Version 2.0 (the "License");
- *  you may not use this file except in compliance with the License.
- *  You may obtain a copy of the License at
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
  *
- *    http://www.apache.org/licenses/LICENSE-2.0
+ *   http://www.apache.org/licenses/LICENSE-2.0
  *
- *  Unless required by applicable law or agreed to in writing, software
- *  distributed under the License is distributed on an "AS IS" BASIS,
- *  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- *  See the License for the specific language governing permissions and
- *  limitations under the License.
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  */
 
 // Client implementation for using the ZAP pentesting proxy remotely.
@@ -24,6 +24,7 @@
 namespace Zap;
 
 use Zap\Acsrf;
+use Zap\AjaxSpider;
 use Zap\Ascan;
 use Zap\Authentication;
 use Zap\Autoupdate;
@@ -32,18 +33,17 @@ use Zap\Context;
 use Zap\Core;
 use Zap\ForcedUser;
 use Zap\HttpSessions;
+use Zap\ImportLogFiles;
 use Zap\Params;
+use Zap\Pnh;
 use Zap\Pscan;
+use Zap\Script;
 use Zap\Search;
 use Zap\SessionManagement;
 use Zap\Spider;
 use Zap\Users;
 
-class ZapError extends \Exception{
-	public function __construct($message, $code = 0, \Exception $previous = null) {
-		parent::__construct($message, $code, $previous);
-	}
-
+class ZapError extends \Exception {
 	public function __toString() {
 		return __CLASS__ . ": [{$this->code}]: {$this->message}\n";
 	}
@@ -71,6 +71,7 @@ class Zapv2 {
 		$this->proxy = $proxy;
 
 		$this->acsrf = new Acsrf($this);
+		$this->ajaxSpider = new AjaxSpider($this);
 		$this->ascan = new Ascan($this);
 		$this->authentication = new Authentication($this);
 		$this->autoupdate = new Autoupdate($this);
@@ -79,8 +80,11 @@ class Zapv2 {
 		$this->core = new Core($this);
 		$this->forcedUser = new ForcedUser($this);
 		$this->httpsessions = new HttpSessions($this);
+		$this->importLogFiles = new ImportLogFiles($this);
 		$this->params = new Params($this);
+		$this->pnh = new Pnh($this);
 		$this->pscan = new Pscan($this);
+		$this->script = new Script($this);
 		$this->search = new Search($this);
 		$this->sessionManagement = new SessionManagement($this);
 		$this->spider = new Spider($this);
@@ -105,19 +109,21 @@ class Zapv2 {
 	 * checks the result json data after doing action request
 	 *
 	 * @param array $json_data the json data to look at.
+	 * @return array
+	 * @throws ZapError
 	 */
 	public function expectOk($json_data) {
-		if (is_object($json_data) && property_exists($json_data, 'Result') && $json_data->{'Result'} == 'OK') {
+		if (is_array($json_data) && reset($json_data) === 'OK') {
 			return $json_data;
 		}
-		//throw new ZapError($json_data->values());
-		throw new ZapError(var_export($json_data, true));
+		throw new ZapError("json_data: " . json_encode($json_data));
 	}
 
 	/**
 	 * Opens a url
 	 *
 	 * @param $url
+	 * @return string
 	 */
 	public function sendRequest($url) {
 		$context = stream_context_create(array('http' => array('proxy' => $this->proxy)));
@@ -128,6 +134,7 @@ class Zapv2 {
 	 * Open a url
 	 *
 	 * @param string $url
+	 * @return string
 	 */
 	public function statusCode($url) {
 		// get the current proxy value
@@ -152,11 +159,12 @@ class Zapv2 {
 	 *
 	 * @param string $url the url to GET at.
 	 * @param array $get the disctionary to turn into GET variables.
+	 * @return mixed
 	 */
 	public function request($url, $get=array()) {
 		$response = $this->sendRequest($url . '?' . $this->urlencode($get));
 		$response = trim($response, '()');
-		return json_decode($response);
+		return json_decode($response, true);
 	}
 
 	/**
@@ -164,6 +172,7 @@ class Zapv2 {
 	 *
 	 * @param string $url the url to GET at.
 	 * @param array $getParams the disctionary to turn into GET variables.
+	 * @return string
 	 */
 	public function requestOther($url, $getParams=array()) {
 		return $this->sendRequest($url . '?' . $this->urlencode($getParams));

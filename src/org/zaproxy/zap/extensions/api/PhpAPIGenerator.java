@@ -23,6 +23,7 @@ import java.io.IOException;
 import java.io.Writer;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.ResourceBundle;
@@ -30,7 +31,8 @@ import java.util.ResourceBundle;
 import org.parosproxy.paros.Constant;
 
 public class PhpAPIGenerator {
-	private File dir = new File("php/api/zapv2/src/Zap");
+	private File dir;
+	private boolean optional = false;
 
 	private final String HEADER =
 			"<?php\n" +
@@ -39,7 +41,7 @@ public class PhpAPIGenerator {
 			" *\n" +
 			" * ZAP is an HTTP/HTTPS proxy for assessing web application security.\n" +
 			" *\n" +
-			" * Copyright the ZAP development team\n" +
+			" * Copyright 2015 the ZAP development team\n" +
 			" *\n" +
 			" * Licensed under the Apache License, Version 2.0 (the \"License\");\n" +
 			" * you may not use this file except in compliance with the License.\n" +
@@ -55,6 +57,8 @@ public class PhpAPIGenerator {
 			" */\n" +
 			"\n\n";
 
+	private final String OPTIONAL_MASSAGE = "This component is optional and therefore the API will only work if it is installed"; 
+
 	private ResourceBundle msgs = ResourceBundle.getBundle("lang." + Constant.MESSAGES_PREFIX, Locale.ENGLISH,
 		ResourceBundle.Control.getControl(ResourceBundle.Control.FORMAT_PROPERTIES));
 
@@ -69,8 +73,17 @@ public class PhpAPIGenerator {
         nameMap = Collections.unmodifiableMap(initMap);
     }
 
-	public void generatePhpFiles() throws IOException {
-		for (ApiImplementor imp : ApiGeneratorUtils.getAllImplementors()) {
+    public PhpAPIGenerator() {
+    	dir = new File("php/api/zapv2/src/Zap"); 
+    }
+
+    public PhpAPIGenerator(String path, boolean optional) {
+    	dir = new File(path); 
+    	this.optional = optional;
+    }
+
+	public void generatePhpFiles(List<ApiImplementor> implementors) throws IOException {
+		for (ApiImplementor imp : implementors) {
 			this.generatePhpComponent(imp);
 		}
 	}
@@ -82,6 +95,19 @@ public class PhpAPIGenerator {
 								element.getMandatoryParamNames().size() > 0) ||
 							(element.getOptionalParamNames() != null &&
 								element.getOptionalParamNames().size() > 0);
+		boolean hasApiParam = (type.equals("action") || type.equals("other"));
+		boolean returnFirstValue = !type.equals("other");
+
+		out.write(generateCommentString(element, component, type));
+
+		out.write(generateFunctionOpeningString(element, hasParams, hasApiParam));	
+
+		out.write(generateFunctionBodyString(element, component, type, hasParams, hasApiParam, returnFirstValue));
+	}
+
+	private String generateCommentString(ApiElement element, String component, String type) {
+
+		StringBuffer comment = new StringBuffer();
 
 		// Add description if defined
 		String descTag = element.getDescriptionTag();
@@ -92,15 +118,30 @@ public class PhpAPIGenerator {
 
 		try {
 			String desc = msgs.getString(descTag);
-			out.write("\t/**\n");
-			out.write("\t * " + desc + "\n");
-			out.write("\t */\n");
+			comment.append("\t/**\n");
+			comment.append("\t * " + desc + "\n");
+			if (optional) {
+				comment.append("\t * " + OPTIONAL_MASSAGE + "\n");
+			}
+			comment.append("\t */\n");
 		} catch (Exception e) {
 			// Might not be set, so just print out the ones that are missing
 			System.out.println("No i18n for: " + descTag);
+			if (optional) {
+				comment.append("\t/**\n");
+				comment.append("\t * " + OPTIONAL_MASSAGE + "\n");
+				comment.append("\t */\n");
+			}
 		}
 
-		out.write("\tpublic function " + createMethodName(element.getName()) + "(");
+		return comment.toString();
+	}
+
+	private String generateFunctionOpeningString(ApiElement element, Boolean hasParams, Boolean hasApiParam) {
+
+		StringBuffer code = new StringBuffer();
+		
+		code.append("\tpublic function " + createMethodName(element.getName()) + "(");
 
 		String paramMan = "";
 		if (element.getMandatoryParamNames() != null) {
@@ -110,7 +151,7 @@ public class PhpAPIGenerator {
 			    }
 				paramMan += "$" + param.toLowerCase();
 			}
-			out.write(paramMan);
+			code.append(paramMan);
 		}
 		String paramOpt = "";
 		if (element.getOptionalParamNames() != null) {
@@ -120,19 +161,44 @@ public class PhpAPIGenerator {
 			    }
 				paramOpt += "$" + param.toLowerCase() + "=''";
 			}
-			out.write(paramOpt);
+			code.append(paramOpt);
 		}
 
-		if (type.equals("action") || type.equals("other")) {
+		if (hasApiParam) {
 		    if (hasParams) {
-		        out.write(", ");
+		        code.append(", ");
 		    }
 			// Always add the API key - we've no way of knowing if it will be required or not
-			out.write("$" + API.API_KEY_PARAM + "=''");
-			hasParams = true;
+			code.append("$" + API.API_KEY_PARAM + "=''");
 		}
 
-		out.write(") {\n");
+		code.append(") {\n");
+
+		return code.toString();
+	}
+	
+	private String generateFunctionBodyString(ApiElement element, String component, String type,
+					Boolean hasParams, Boolean hasApiParam, Boolean returnFirstValue) {
+
+		String reqString = generateRequestString(element, component, type, hasParams, hasApiParam);
+		StringBuffer code = new StringBuffer();
+
+		if (returnFirstValue) {
+			code.append(String.format("\t\t$res = %s;\n", reqString));
+			code.append("\t\treturn reset($res);\n");
+		} else {
+			code.append(String.format("\t\treturn %s;\n", reqString));
+		}
+
+		code.append("\t}\n\n");
+
+		return code.toString();
+	}
+
+	private String generateRequestString(ApiElement element, String component,
+										 String type, Boolean hasParams, Boolean hasApiParam) {
+
+		StringBuffer code = new StringBuffer();
 
 		String method = "request";
 		String baseUrl = "base";
@@ -141,20 +207,20 @@ public class PhpAPIGenerator {
 			baseUrl += "other";
 		}
 
-		out.write("\t\treturn $this->zap->" + method + "($this->zap->" + baseUrl + " . '" +
+		code.append("$this->zap->" + method + "($this->zap->" + baseUrl + " . '" +
 				component + "/" + type + "/" + element.getName() + "/'");
 
-		if (hasParams) {
-			out.write(", array(");
+		if (hasParams || hasApiParam) {
+			code.append(", array(");
 			boolean first = true;
 			if (element.getMandatoryParamNames() != null) {
 				for (String param : element.getMandatoryParamNames()) {
 					if (first) {
 						first = false;
 					} else {
-						out.write(", ");
+						code.append(", ");
 					}
-					out.write("'" + param + "' => $" + param.toLowerCase());
+					code.append("'" + param + "' => $" + param.toLowerCase());
 				}
 			}
 			if (element.getOptionalParamNames() != null) {
@@ -162,37 +228,27 @@ public class PhpAPIGenerator {
 					if (first) {
 						first = false;
 					} else {
-						out.write(", ");
+						code.append(", ");
 					}
-					out.write("'" + param + "' => $" + param.toLowerCase());
+					code.append("'" + param + "' => $" + param.toLowerCase());
 				}
 			}
-			if (type.equals("action") || type.equals("other")) {
+			if (hasApiParam) {
 					// Always add the API key - we've no way of knowing if it will be required or not
 					if (first) {
 						first = false;
 					} else {
-						out.write(", ");
+						code.append(", ");
 					}
-					out.write("'" + API.API_KEY_PARAM + "' => $" + API.API_KEY_PARAM);
+					code.append("'" + API.API_KEY_PARAM + "' => $" + API.API_KEY_PARAM);
 			}
-			out.write("))");
-			if (type.equals("view")) {
-				out.write("->{'" + element.getName() + "'};\n");
-			} else {
-			    out.write(";\n");
-			}
-		} else if (!type.equals("other")) {
-			if (element.getName().startsWith("option")) {
-				out.write(")->{'" + element.getName().substring(6) + "'};\n");
-			} else {
-				out.write(")->{'" + element.getName() + "'};\n");
-			}
-		} else {
-			out.write(");\n");
-		}
-		out.write("\t}\n\n");
 
+			code.append(")");
+		}
+
+		code.append(")");
+
+		return code.toString();
 	}
 
 	private static String createMethodName(String name) {
@@ -247,7 +303,7 @@ public class PhpAPIGenerator {
 
 	public static void main(String[] args) throws Exception {
 		PhpAPIGenerator wapi = new PhpAPIGenerator();
-		wapi.generatePhpFiles();
+		wapi.generatePhpFiles(ApiGeneratorUtils.getAllImplementors());
 	}
 
 }
