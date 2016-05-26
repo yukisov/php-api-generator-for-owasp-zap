@@ -57,7 +57,7 @@ public class PhpAPIGenerator {
 			" */\n" +
 			"\n\n";
 
-	private final String OPTIONAL_MASSAGE = "This component is optional and therefore the API will only work if it is installed"; 
+	private final String OPTIONAL_MASSAGE = "This component is optional and therefore the API will only work if it is installed";
 
 	private ResourceBundle msgs = ResourceBundle.getBundle("lang." + Constant.MESSAGES_PREFIX, Locale.ENGLISH,
 		ResourceBundle.Control.getControl(ResourceBundle.Control.FORMAT_PROPERTIES));
@@ -74,11 +74,11 @@ public class PhpAPIGenerator {
     }
 
     public PhpAPIGenerator() {
-    	dir = new File("php/api/zapv2/src/Zap"); 
+    	dir = new File("php/api/zapv2/src/Zap");
     }
 
     public PhpAPIGenerator(String path, boolean optional) {
-    	dir = new File(path); 
+    	dir = new File(path);
     	this.optional = optional;
     }
 
@@ -88,13 +88,26 @@ public class PhpAPIGenerator {
 		}
 	}
 
-	private void generatePhpElement(ApiElement element, String component, 
+	private void generatePhpElement(ApiElement element, String component,
 			String type, Writer out) throws IOException {
 
-		boolean hasParams = (element.getMandatoryParamNames() != null && 
+		boolean hasParams = (element.getMandatoryParamNames() != null &&
 								element.getMandatoryParamNames().size() > 0) ||
 							(element.getOptionalParamNames() != null &&
 								element.getOptionalParamNames().size() > 0);
+
+		boolean needToAddApiKeyParam = (type.equals("action") || type.equals("other"));
+
+		out.write(generateCommentString(element, component, type));
+
+		out.write(generateFunctionOpeningString(element, hasParams, needToAddApiKeyParam));
+
+		out.write(generateFunctionBodyString(element, component, type, hasParams, needToAddApiKeyParam));
+	}
+
+	private String generateCommentString(ApiElement element, String component, String type) {
+
+		StringBuffer comment = new StringBuffer();
 
 		// Add description if defined
 		String descTag = element.getDescriptionTag();
@@ -105,23 +118,31 @@ public class PhpAPIGenerator {
 
 		try {
 			String desc = msgs.getString(descTag);
-			out.write("\t/**\n");
-			out.write("\t * " + desc + "\n");
+			comment.append("\t/**\n");
+			comment.append("\t * " + desc + "\n");
 			if (optional) {
-				out.write("\t * " + OPTIONAL_MASSAGE + "\n");
+				comment.append("\t * " + OPTIONAL_MASSAGE + "\n");
 			}
-			out.write("\t */\n");
+			comment.append("\t */\n");
 		} catch (Exception e) {
 			// Might not be set, so just print out the ones that are missing
 			System.out.println("No i18n for: " + descTag);
 			if (optional) {
-				out.write("\t/**\n");
-				out.write("\t * " + OPTIONAL_MASSAGE + "\n");
-				out.write("\t */\n");
+				comment.append("\t/**\n");
+				comment.append("\t * " + OPTIONAL_MASSAGE + "\n");
+				comment.append("\t */\n");
 			}
 		}
 
-		out.write("\tpublic function " + createMethodName(element.getName()) + "(");
+		return comment.toString();
+	}
+
+	private String generateFunctionOpeningString(ApiElement element, boolean hasParams,
+													boolean needToAppApiKeyParam) {
+
+		StringBuffer code = new StringBuffer();
+
+		code.append("\tpublic function " + createMethodName(element.getName()) + "(");
 
 		String paramMan = "";
 		if (element.getMandatoryParamNames() != null) {
@@ -131,7 +152,7 @@ public class PhpAPIGenerator {
 			    }
 				paramMan += "$" + param.toLowerCase();
 			}
-			out.write(paramMan);
+			code.append(paramMan);
 		}
 		String paramOpt = "";
 		if (element.getOptionalParamNames() != null) {
@@ -141,22 +162,30 @@ public class PhpAPIGenerator {
 			    }
 				paramOpt += "$" + param.toLowerCase() + "=NULL";
 			}
-			out.write(paramOpt);
+			code.append(paramOpt);
 		}
 
-		if (type.equals("action") || type.equals("other")) {
-		    if (hasParams) {
-		        out.write(", ");
-		    }
+		if (needToAppApiKeyParam) {
+			if (hasParams) {
+				code.append(", ");
+			}
 			// Always add the API key - we've no way of knowing if it will be required or not
-			out.write("$" + API.API_KEY_PARAM + "=''");
-			hasParams = true;
+			code.append("$" + API.API_KEY_PARAM + "=''");
 		}
 
-		out.write(") {\n");
+		code.append(") {\n");
 
+		return code.toString();
+	}
+
+	private String generateFunctionBodyString(ApiElement element, String component,
+											String type, boolean hasParams, boolean needToAddApiKeyParam) {
+
+		boolean hasAnyParams = hasParams || needToAddApiKeyParam;
+		StringBuffer code = new StringBuffer();
 		StringBuilder reqParams = new StringBuilder();
-		if (hasParams) {
+
+		if (hasAnyParams) {
 			reqParams.append("array(");
 			boolean first = true;
 			if (element.getMandatoryParamNames() != null) {
@@ -169,7 +198,7 @@ public class PhpAPIGenerator {
 					reqParams.append("'" + param + "' => $" + param.toLowerCase());
 				}
 			}
-			if (type.equals("action") || type.equals("other")) {
+			if (needToAddApiKeyParam) {
 				// Always add the API key - we've no way of knowing if it will be required or not
 				if (!first) {
 					reqParams.append(", ");
@@ -179,15 +208,15 @@ public class PhpAPIGenerator {
 			reqParams.append(")");
 
 			if (element.getOptionalParamNames() != null && !element.getOptionalParamNames().isEmpty()) {
-				out.write("\t\t$params = ");
-				out.write(reqParams.toString());
-				out.write(";\n");
+				code.append("\t\t$params = ");
+				code.append(reqParams.toString());
+				code.append(";\n");
 				reqParams.replace(0, reqParams.length(), "$params");
 
 				for (String param : element.getOptionalParamNames()) {
-					out.write("\t\tif ($" + param.toLowerCase() + " !== NULL) {\n");
-					out.write("\t\t\t$params['" + param + "'] = $" + param.toLowerCase() + ";\n");
-					out.write("\t\t}\n");
+					code.append("\t\tif ($" + param.toLowerCase() + " !== NULL) {\n");
+					code.append("\t\t\t$params['" + param + "'] = $" + param.toLowerCase() + ";\n");
+					code.append("\t\t}\n");
 				}
 			}
 		}
@@ -199,29 +228,30 @@ public class PhpAPIGenerator {
 			baseUrl += "_other";
 		}
 
-		out.write("\t\treturn $this->zap->" + method + "($this->zap->" + baseUrl + " . '" +
+		code.append("\t\treturn $this->zap->" + method + "($this->zap->" + baseUrl + " . '" +
 				component + "/" + type + "/" + element.getName() + "/'");
 
-		if (hasParams) {
-			out.write(", ");
-			out.write(reqParams.toString());
-			out.write(")");
+		if (hasAnyParams) {
+			code.append(", ");
+			code.append(reqParams.toString());
+			code.append(")");
 			if (type.equals("view")) {
-				out.write("->{'" + element.getName() + "'};\n");
+				code.append("->{'" + element.getName() + "'};\n");
 			} else {
-			    out.write(";\n");
+			    code.append(";\n");
 			}
 		} else if (!type.equals("other")) {
 			if (element.getName().startsWith("option")) {
-				out.write(")->{'" + element.getName().substring(6) + "'};\n");
+				code.append(")->{'" + element.getName().substring(6) + "'};\n");
 			} else {
-				out.write(")->{'" + element.getName() + "'};\n");
+				code.append(")->{'" + element.getName() + "'};\n");
 			}
 		} else {
-			out.write(");\n");
+			code.append(");\n");
 		}
-		out.write("\t}\n\n");
+		code.append("\t}\n\n");
 
+		return code.toString();
 	}
 
 	private static String createMethodName(String name) {
