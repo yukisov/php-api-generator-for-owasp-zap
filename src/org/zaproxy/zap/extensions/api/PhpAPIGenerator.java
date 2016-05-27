@@ -97,12 +97,14 @@ public class PhpAPIGenerator {
 								element.getOptionalParamNames().size() > 0);
 
 		boolean needToAddApiKeyParam = (type.equals("action") || type.equals("other"));
+		boolean returnFirstValue = !type.equals("other");
 
 		out.write(generateCommentString(element, component, type));
 
 		out.write(generateFunctionOpeningString(element, hasParams, needToAddApiKeyParam));
 
-		out.write(generateFunctionBodyString(element, component, type, hasParams, needToAddApiKeyParam));
+		out.write(generateFunctionBodyString(element, component, type, hasParams,
+											needToAddApiKeyParam, returnFirstValue));
 	}
 
 	private String generateCommentString(ApiElement element, String component, String type) {
@@ -179,7 +181,8 @@ public class PhpAPIGenerator {
 	}
 
 	private String generateFunctionBodyString(ApiElement element, String component,
-											String type, boolean hasParams, boolean needToAddApiKeyParam) {
+											String type, boolean hasParams,
+											boolean needToAddApiKeyParam, boolean returnFirstValue) {
 
 		boolean hasAnyParams = hasParams || needToAddApiKeyParam;
 		StringBuffer code = new StringBuffer();
@@ -228,27 +231,21 @@ public class PhpAPIGenerator {
 			baseUrl += "_other";
 		}
 
-		code.append("\t\treturn $this->zap->" + method + "($this->zap->" + baseUrl + " . '" +
-				component + "/" + type + "/" + element.getName() + "/'");
-
+		StringBuffer reqString = new StringBuffer("$this->zap->" + method + "($this->zap->" + baseUrl + " . '"
+								+ component + "/" + type + "/" + element.getName() + "/'");
 		if (hasAnyParams) {
-			code.append(", ");
-			code.append(reqParams.toString());
-			code.append(")");
-			if (type.equals("view")) {
-				code.append("->{'" + element.getName() + "'};\n");
-			} else {
-			    code.append(";\n");
-			}
-		} else if (!type.equals("other")) {
-			if (element.getName().startsWith("option")) {
-				code.append(")->{'" + element.getName().substring(6) + "'};\n");
-			} else {
-				code.append(")->{'" + element.getName() + "'};\n");
-			}
-		} else {
-			code.append(");\n");
+			reqString.append(", ");
+			reqString.append(reqParams.toString());
 		}
+		reqString.append(")");
+
+		if (returnFirstValue) {
+			code.append(String.format("\t\t$res = %s;\n", reqString.toString()));
+			code.append("\t\treturn reset($res);\n");
+		} else {
+			code.append(String.format("\t\treturn %s;\n", reqString.toString()));
+		}
+
 		code.append("\t}\n\n");
 
 		return code.toString();
